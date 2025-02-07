@@ -11,8 +11,8 @@ from discord.ext import commands
 # Lấy Token từ biến môi trường
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
-# ID của kênh được phép bot hoạt động
-ALLOWED_CHANNEL_ID = 1337203470167576607  # Thay bằng ID kênh của bạn
+# ID của kênh được phép bot hoạt động (Thay bằng ID kênh Discord thực tế)
+ALLOWED_CHANNEL_ID = 1337203470167576607  # Cập nhật Channel ID của bạn
 
 # Tên file dữ liệu Excel
 EXCEL_FILE = "passive_skills.xlsx"
@@ -23,29 +23,19 @@ if not os.path.exists(EXCEL_FILE):
     df.to_excel(EXCEL_FILE, index=False)
     print("✅ Đã tạo file passive_skills.xlsx")
 
+# Load dữ liệu từ file Excel
 def load_data():
-    """Load dữ liệu từ file Excel"""
-    return pd.read_excel(EXCEL_FILE).fillna("")  # Xử lý giá trị NaN nếu có
+    return pd.read_excel(EXCEL_FILE).fillna("")
 
 data = load_data()
-
-# Khởi tạo bộ dịch Google Translate
-translator = Translator()
-
-def translate_text(text):
-    """Dịch văn bản từ tiếng Anh sang tiếng Việt"""
-    translated_text = translator.translate(text, src="en", dest="vi").text
-    return translated_text
 
 # Thiết lập intents cho bot
 intents = discord.Intents.default()
 intents.message_content = True
-intents.guilds = True
-intents.typing = False
-intents.presences = False
 
 # Khởi tạo bot với prefix "!"
 bot = commands.Bot(command_prefix="!", intents=intents)
+translator = Translator()
 
 @bot.event
 async def on_ready():
@@ -54,59 +44,71 @@ async def on_ready():
 
 @bot.event
 async def on_message(message):
-    """Chỉ xử lý tin nhắn trong kênh được phép"""
-    if message.author == bot.user:
+    """Xử lý tin nhắn và tìm skill theo tên hoặc ảnh"""
+    if message.author == bot.user or message.channel.id != ALLOWED_CHANNEL_ID:
         return
-    if message.channel.id != ALLOWED_CHANNEL_ID:
-        return  # Bỏ qua tin nhắn nếu không phải kênh cho phép
 
-    # Xử lý lệnh bot trước
+    # Xử lý tin nhắn văn bản (tìm skill theo tên)
+    skill_name = message.content.strip().lower()
+    skill_info = data[data["Name"].str.strip().str.lower() == skill_name]
+
+    if not skill_info.empty:
+        skill_type = skill_info.iloc[0]["Type"]
+        skill_effect = skill_info.iloc[0]["Effect"]
+        skill_effect_vi = translator.translate(skill_effect, src="en", dest="vi").text
+
+        response = (
+            f'**{skill_name.capitalize()}** ({skill_type})\n'
+            f'📜 **Effect (EN):** {skill_effect}\n'
+            f'🇻🇳 **Effect (VI) (Bấm để mở):** ||{skill_effect_vi}||'
+        )
+        await message.channel.send(response)
+
+    # Xử lý ảnh nếu có ảnh đính kèm
+    elif message.attachments:
+        await process_image(message, message.attachments[0])
+
+    # Nếu không phải lệnh và không tìm thấy skill
+    elif not message.content.startswith("!"):
+        await message.channel.send("❌ Không tìm thấy Skill! Kiểm tra lại xem đã nhập đúng chưa.")
+
+    # Xử lý lệnh bot
     await bot.process_commands(message)
 
-    # Nếu tin nhắn có ảnh, tiến hành trích xuất văn bản
-    if message.attachments:
-        for attachment in message.attachments:
-            if any(attachment.filename.lower().endswith(ext) for ext in ["png", "jpg", "jpeg"]):
-                await process_image(message, attachment)
-
 async def process_image(message, attachment):
-    """Trích xuất văn bản từ ảnh và tìm kiếm Skill"""
-    response = requests.get(attachment.url)
-    img = Image.open(BytesIO(response.content))
+    """Trích xuất skill từ ảnh bằng Tesseract OCR"""
+    try:
+        img_url = attachment.url
+        response = requests.get(img_url)
+        img = Image.open(BytesIO(response.content))
 
-    # Sử dụng Tesseract OCR để nhận diện văn bản
-    extracted_text = pytesseract.image_to_string(img)
+        extracted_text = pytesseract.image_to_string(img)
+        print(f"OCR Extracted Text: {extracted_text}")  # Debugging
 
-    # Lọc danh sách Skill từ văn bản OCR
-    skill_names = []
-    for line in extracted_text.split("\n"):
-        line = line.strip()
-        if line.lower().startswith("allocates "):
-            skill_name = line.replace("Allocates ", "").strip()
-            skill_names.append(skill_name)
+        found_skills = []
+        for skill in data["Name"]:
+            if skill.lower() in extracted_text.lower():
+                found_skills.append(skill)
 
-    if not skill_names:
-        await message.channel.send("❌ Không tìm thấy Skill nào trong ảnh!")
-        return
+        if found_skills:
+            response_text = "**🔍 Skill phát hiện trong ảnh:**\n"
+            for skill in found_skills:
+                skill_info = data[data["Name"] == skill].iloc[0]
+                skill_type = skill_info["Type"]
+                skill_effect = skill_info["Effect"]
+                skill_effect_vi = translator.translate(skill_effect, src="en", dest="vi").text
 
-    # Tạo phản hồi với thông tin Skill tìm được
-    response_text = "**📜 Các Skill tìm thấy:**\n"
-    for skill_name in skill_names:
-        skill_info = data[data["Name"].str.strip().str.lower() == skill_name.lower()]
-        if not skill_info.empty:
-            skill_type = skill_info.iloc[0]["Type"]
-            skill_effect = skill_info.iloc[0]["Effect"]
-            skill_effect_vi = translate_text(skill_effect)
-
-            response_text += (
-                f'\n🔹 **{skill_name}** ({skill_type})\n'
-                f'📜 **Effect (EN):** {skill_effect}\n'
-                f'🇻🇳 **Effect (VI):** ||{skill_effect_vi}||\n'
-            )
+                response_text += (
+                    f'\n**{skill}** ({skill_type})\n'
+                    f'📜 **Effect (EN):** {skill_effect}\n'
+                    f'🇻🇳 **Effect (VI) (Bấm để mở):** ||{skill_effect_vi}||\n'
+                )
+            await message.channel.send(response_text)
         else:
-            response_text += f'\n❌ **{skill_name}** - Không có trong dữ liệu!\n'
+            await message.channel.send("⚠️ Không tìm thấy Skill nào trong ảnh!")
 
-    await message.channel.send(response_text)
+    except Exception as e:
+        await message.channel.send(f"❌ Lỗi xử lý ảnh: {str(e)}")
 
 @bot.command()
 @commands.has_permissions(manage_messages=True)
