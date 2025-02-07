@@ -8,13 +8,13 @@ from discord.ext import commands
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
 # ID của kênh Discord mà bot được phép hoạt động
-ALLOWED_CHANNEL_ID = 1337203470167576607  # Cập nhật ID mới
+ALLOWED_CHANNEL_ID = 1337203470167576607  # Cập nhật ID kênh Discord
 
 # Tên file dữ liệu Excel
 EXCEL_FILE = "passive_skills.xlsx"
 
-# Bộ nhớ tạm để lưu trạng thái người dùng trong kênh
-user_session = set()  # Chỉ lưu ID của những user đã nhận thông báo
+# ID của tin nhắn ghim (sẽ cập nhật sau lần chạy đầu)
+PINNED_MESSAGE_ID = None  
 
 # Kiểm tra và tạo file Excel nếu chưa tồn tại
 if not os.path.exists(EXCEL_FILE):
@@ -28,12 +28,16 @@ def load_data():
 
 data = load_data()
 
+# Đếm tổng số lượng Skill
+def get_total_skill_count():
+    return len(data)
+
 # Thiết lập intents cho bot
 intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
-intents.presences = True
-intents.members = True  # Cần bật "Server Members Intent"
+intents.presences = False
+intents.members = False
 
 # Khởi tạo bot với prefix "!"
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -42,19 +46,30 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 async def on_ready():
     """Bot đã khởi động thành công"""
     print(f'✅ Bot đã kết nối với Discord! Logged in as {bot.user}')
-    print(f'🔹 Tổng số Skill hiện tại: {len(data)}')
+    print(f'🔹 Tổng số Skill hiện tại: {get_total_skill_count()}')
+    
+    # Đảm bảo tin nhắn ghim được cập nhật đúng
+    channel = bot.get_channel(ALLOWED_CHANNEL_ID)
+    if channel:
+        await update_pinned_message(channel)
 
-@bot.event
-async def on_typing(channel, user, when):
-    """Gửi tin nhắn chào mừng khi người dùng lần đầu chọn ô nhập"""
-    if channel.id == ALLOWED_CHANNEL_ID and user.id not in user_session:
-        user_session.add(user.id)  # Lưu trạng thái user đã nhận tin nhắn
-        skill_count = len(data)
-        welcome_message = await channel.send(
-            f"👋 **Chào {user.mention}!**\n📌 Hiện tại có **{skill_count}** Skill.\n✍️ Gửi tên Skill để kiểm tra ngay!"
-        )
-        await asyncio.sleep(30)  # Xóa tin nhắn sau 30 giây
-        await welcome_message.delete()
+async def update_pinned_message(channel):
+    """Cập nhật tin nhắn ghim với tổng số Skill"""
+    global PINNED_MESSAGE_ID
+
+    skill_count = get_total_skill_count()
+    message_content = f"📌 **Có tổng cộng {skill_count} Skill Not**\n📝 Hãy nhập chính xác tên Skill Not để kiểm tra!"
+
+    async for message in channel.history(limit=50):
+        if message.pinned:
+            await message.edit(content=message_content)
+            PINNED_MESSAGE_ID = message.id
+            return
+    
+    # Nếu không có tin nhắn ghim, tạo mới và ghim lại
+    new_message = await channel.send(message_content)
+    await new_message.pin()
+    PINNED_MESSAGE_ID = new_message.id
 
 @bot.event
 async def on_message(message):
@@ -64,7 +79,7 @@ async def on_message(message):
     if message.channel.id != ALLOWED_CHANNEL_ID:
         return  # Bỏ qua tin nhắn nếu không phải kênh cho phép
 
-    # Xử lý lệnh bot trước (fix lỗi !clear)
+    # Xử lý lệnh bot trước
     await bot.process_commands(message)
 
     # Chuẩn hóa tên Skill để tìm kiếm chính xác
@@ -80,13 +95,6 @@ async def on_message(message):
         if not message.content.startswith("!"):  # Tránh báo lỗi khi gõ lệnh
             await message.channel.send("❌ Không tìm thấy Skill! Kiểm tra lại xem đã nhập đúng chưa.")
 
-@bot.event
-async def on_member_update(before, after):
-    """Xóa user khỏi session khi họ rời kênh"""
-    if before.activity and after.activity:
-        if before.activity.name == "Reading Messages" and after.activity.name != "Reading Messages":
-            user_session.discard(after.id)  # Xóa user khỏi cache khi họ rời kênh
-
 @bot.command()
 @commands.has_permissions(manage_messages=True)
 async def clear(ctx, amount: int = 100):
@@ -95,6 +103,7 @@ async def clear(ctx, amount: int = 100):
         try:
             deleted = await ctx.channel.purge(limit=amount)
             await ctx.send(f"🧹 **Đã xóa {len(deleted)} tin nhắn trong kênh này!**", delete_after=5)
+            await update_pinned_message(ctx.channel)  # Cập nhật tin nhắn ghim sau khi xóa
         except discord.Forbidden:
             await ctx.send("❌ Bot không có quyền xóa tin nhắn! Hãy kiểm tra quyền 'Manage Messages'.")
         except discord.HTTPException:
