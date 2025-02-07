@@ -1,13 +1,17 @@
 import os
 import discord
 import pandas as pd
+import pytesseract
+from PIL import Image
+import requests
+from io import BytesIO
 from googletrans import Translator
 from discord.ext import commands
 
 # Lấy Token từ biến môi trường
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
-# ID của kênh được phép bot hoạt động (Cập nhật theo server của bạn)
+# ID của kênh được phép bot hoạt động
 ALLOWED_CHANNEL_ID = 1337203470167576607  # Thay bằng ID kênh của bạn
 
 # Tên file dữ liệu Excel
@@ -25,7 +29,7 @@ def load_data():
 
 data = load_data()
 
-# Khởi tạo bộ dịch
+# Khởi tạo bộ dịch Google Translate
 translator = Translator()
 
 def translate_text(text):
@@ -59,24 +63,50 @@ async def on_message(message):
     # Xử lý lệnh bot trước
     await bot.process_commands(message)
 
-    # Chuẩn hóa tên Skill để tìm kiếm chính xác
-    skill_name = message.content.strip().lower()
-    skill_info = data[data["Name"].str.strip().str.lower() == skill_name]
+    # Nếu tin nhắn có ảnh, tiến hành trích xuất văn bản
+    if message.attachments:
+        for attachment in message.attachments:
+            if any(attachment.filename.lower().endswith(ext) for ext in ["png", "jpg", "jpeg"]):
+                await process_image(message, attachment)
 
-    if not skill_info.empty:
-        skill_type = skill_info.iloc[0]["Type"]
-        skill_effect = skill_info.iloc[0]["Effect"]
-        skill_effect_vi = translate_text(skill_effect)  # Dịch sang tiếng Việt
+async def process_image(message, attachment):
+    """Trích xuất văn bản từ ảnh và tìm kiếm Skill"""
+    response = requests.get(attachment.url)
+    img = Image.open(BytesIO(response.content))
 
-        response = (
-            f'**{skill_name.capitalize()}** ({skill_type})\n'
-            f'📜 **Effect (EN):** {skill_effect}\n'
-            f'🇻🇳 **Effect (VI):** {skill_effect_vi}'
-        )
-        await message.channel.send(response)
-    else:
-        if not message.content.startswith("!"):  # Tránh báo lỗi khi gõ lệnh bot
-            await message.channel.send("❌ Không tìm thấy Skill! Kiểm tra lại xem đã nhập đúng chưa.")
+    # Sử dụng Tesseract OCR để nhận diện văn bản
+    extracted_text = pytesseract.image_to_string(img)
+
+    # Lọc danh sách Skill từ văn bản OCR
+    skill_names = []
+    for line in extracted_text.split("\n"):
+        line = line.strip()
+        if line.lower().startswith("allocates "):
+            skill_name = line.replace("Allocates ", "").strip()
+            skill_names.append(skill_name)
+
+    if not skill_names:
+        await message.channel.send("❌ Không tìm thấy Skill nào trong ảnh!")
+        return
+
+    # Tạo phản hồi với thông tin Skill tìm được
+    response_text = "**📜 Các Skill tìm thấy:**\n"
+    for skill_name in skill_names:
+        skill_info = data[data["Name"].str.strip().str.lower() == skill_name.lower()]
+        if not skill_info.empty:
+            skill_type = skill_info.iloc[0]["Type"]
+            skill_effect = skill_info.iloc[0]["Effect"]
+            skill_effect_vi = translate_text(skill_effect)
+
+            response_text += (
+                f'\n🔹 **{skill_name}** ({skill_type})\n'
+                f'📜 **Effect (EN):** {skill_effect}\n'
+                f'🇻🇳 **Effect (VI):** ||{skill_effect_vi}||\n'
+            )
+        else:
+            response_text += f'\n❌ **{skill_name}** - Không có trong dữ liệu!\n'
+
+    await message.channel.send(response_text)
 
 @bot.command()
 @commands.has_permissions(manage_messages=True)
