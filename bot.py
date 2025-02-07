@@ -42,12 +42,12 @@ async def on_ready():
     print(f'🔹 Tổng số Skill hiện tại: {len(data)}')
 
 @bot.event
-async def on_guild_channel_pins_update(channel, last_pin):
-    """Gửi tin nhắn khi user mở kênh"""
-    if channel.id == ALLOWED_CHANNEL_ID:
+async def on_typing(channel, user, when):
+    """Gửi tin nhắn khi user mở kênh và chuẩn bị nhập tin nhắn"""
+    if channel.id == ALLOWED_CHANNEL_ID and not user.bot:
         skill_count = len(data)
         welcome_message = await channel.send(
-            f"👋 **Chào mừng bạn!**\n📌 Hiện tại có **{skill_count}** Skill.\n✍️ Gửi tên Skill để kiểm tra ngay!"
+            f"👋 **Chào {user.mention}!**\n📌 Hiện tại có **{skill_count}** Skill.\n✍️ Gửi tên Skill để kiểm tra ngay!"
         )
         await asyncio.sleep(30)  # Xóa tin nhắn sau 30 giây
         await welcome_message.delete()
