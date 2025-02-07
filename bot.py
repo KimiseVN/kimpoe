@@ -3,7 +3,7 @@ import discord
 import pandas as pd
 import asyncio
 from discord.ext import commands
-from googletrans import Translator  # Thêm thư viện dịch
+from googletrans import Translator  # Dùng googletrans để dịch
 
 # Lấy Token từ biến môi trường
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
@@ -13,6 +13,14 @@ ALLOWED_CHANNEL_ID = 1337203470167576607  # Cập nhật ID kênh Discord
 
 # Tên file dữ liệu Excel
 EXCEL_FILE = "passive_skills.xlsx"
+
+# Danh sách từ khóa cần giữ nguyên khi dịch
+EXCLUDED_WORDS = [
+    "Critical Strike", "Spell Damage", "Fire Resistance", "Cold Resistance", "Life Leech",
+    "Strength", "Dexterity", "Intelligence", "Energy Shield", "Spirit", "Armour", "Evasion",
+    "Accuracy", "Physical Damage", "Critical Damage Bonus", "Critical Chance", "Life", "Mana",
+    "Attributes", "Lightning Damage", "Cold Damage", "Fire Damage"
+]
 
 # ID của tin nhắn ghim (sẽ cập nhật sau lần chạy đầu)
 PINNED_MESSAGE_ID = None  
@@ -35,6 +43,26 @@ data = load_data()
 # Đếm tổng số lượng Skill
 def get_total_skill_count():
     return len(data)
+
+# Hàm dịch Google Translate nhưng giữ nguyên một số từ
+def translate_with_exclusions(text, excluded_words):
+    """Dịch văn bản sang tiếng Việt nhưng giữ nguyên một số từ"""
+    replacement_map = {}
+
+    # Thay thế các từ cần giữ nguyên bằng mã đặc biệt
+    for i, word in enumerate(excluded_words):
+        placeholder = f"{{EXCLUDE_{i}}}"
+        replacement_map[placeholder] = word
+        text = text.replace(word, placeholder)
+
+    # Dịch văn bản
+    translated_text = translator.translate(text, src="en", dest="vi").text
+
+    # Thay thế lại các từ đã giữ nguyên
+    for placeholder, word in replacement_map.items():
+        translated_text = translated_text.replace(placeholder, word)
+
+    return translated_text
 
 # Thiết lập intents cho bot
 intents = discord.Intents.default()
@@ -87,18 +115,20 @@ async def on_message(message):
     await bot.process_commands(message)
 
     # Chuẩn hóa tên Skill để tìm kiếm chính xác
-    skill_name = message.content.strip().lower()
-    skill_info = data[data["Name"].str.strip().str.lower() == skill_name]
+    skill_query = message.content.strip().lower()
+    skill_results = data[data["Name"].str.strip().str.lower() == skill_query]  # Chỉ tìm tên Skill chính xác
 
-    if not skill_info.empty:
-        skill_type = skill_info.iloc[0]["Type"]
-        skill_effect = skill_info.iloc[0]["Effect"]
+    if not skill_results.empty:
+        row = skill_results.iloc[0]  # Lấy đúng 1 kết quả khớp
+        skill_name = row["Name"]
+        skill_type = row["Type"]
+        skill_effect = row["Effect"]
 
-        # Dịch phần Effect sang Tiếng Việt
-        translated_effect = translator.translate(skill_effect, src="en", dest="vi").text
+        # Dịch phần Effect sang Tiếng Việt nhưng giữ nguyên thuật ngữ
+        translated_effect = translate_with_exclusions(skill_effect, EXCLUDED_WORDS)
 
         response = (
-            f'**{skill_name.capitalize()}** ({skill_type})\n'
+            f'**{skill_name}** ({skill_type})\n'
             f'📜 **Effect (EN):** {skill_effect}\n'
             f'🇻🇳 **Effect (VI):** {translated_effect}'
         )
