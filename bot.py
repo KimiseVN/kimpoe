@@ -7,10 +7,10 @@ from discord.ext import commands
 # Lấy Token từ biến môi trường
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
-# ID của kênh được phép bot hoạt động (Thay bằng ID kênh thực tế của bạn)
-ALLOWED_CHANNEL_ID = 1337203470167576607  # Thay bằng ID kênh Discord của bạn
+# ID của kênh cho phép bot hoạt động (Thay bằng ID kênh Discord thực tế)
+ALLOWED_CHANNEL_ID = 1337203470167576607  # Thay bằng ID kênh của bạn
 
-# Dictionary lưu ID tin nhắn chào mừng của mỗi người dùng
+# Dictionary lưu ID tin nhắn thông báo để xóa khi rời kênh
 welcome_messages = {}
 
 # Tên file dữ liệu Excel
@@ -101,12 +101,14 @@ async def clear(ctx, amount: int = 100):
     if ctx.channel.id == ALLOWED_CHANNEL_ID:
         try:
             deleted = await ctx.channel.purge(limit=amount)
-            await ctx.send(f"🧹 **Đã xóa {len(deleted)} tin nhắn trong kênh này!**", delete_after=5)
+            confirm_msg = await ctx.send(f"🧹 **Đã xóa {len(deleted)} tin nhắn trong kênh này!**")
+            await asyncio.sleep(5)
+            await confirm_msg.delete()
         except discord.Forbidden:
-            await ctx.send("❌ Bot không có quyền xóa tin nhắn! Hãy kiểm tra quyền 'Manage Messages'.")
+            await ctx.send("❌ **Bot không có quyền xóa tin nhắn!** Hãy kiểm tra quyền 'Manage Messages'.")
         except discord.HTTPException:
-            await ctx.send("❌ Lỗi khi xóa tin nhắn! Hãy thử lại sau.")
+            await ctx.send("❌ **Lỗi khi xóa tin nhắn!** Hãy thử lại sau.")
     else:
-        await ctx.send("❌ Lệnh này chỉ có thể sử dụng trong kênh được chỉ định.")
+        await ctx.send("❌ **Lệnh này chỉ có thể sử dụng trong kênh được chỉ định.**")
 
 bot.run(TOKEN)
