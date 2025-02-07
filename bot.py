@@ -30,7 +30,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
 intents.presences = True
-intents.members = True  # Cần bật "Server Members Intent"
+intents.members = True  # Cần bật "Server Members Intent" trong Developer Portal
 
 # Khởi tạo bot với prefix "!"
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -42,23 +42,15 @@ async def on_ready():
     print(f'🔹 Tổng số Skill hiện tại: {len(data)}')
 
 @bot.event
-async def on_member_update(before, after):
-    """Gửi tin nhắn chào mừng khi thành viên vào kênh"""
-    guild = after.guild
-    member = after
-
-    # Lấy kênh văn bản Discord
-    channel = guild.get_channel(ALLOWED_CHANNEL_ID)
-
-    # Kiểm tra nếu người dùng đang xem kênh
-    if after.activity and hasattr(after.activity, "name"):
-        if after.activity.name == "Reading Messages" and channel:
-            skill_count = len(data)
-            welcome_message = await channel.send(
-                f"👋 **Chào {member.mention}!**\n📌 Hiện tại có **{skill_count}** Skill Not.\n✍️ Gửi tên Skill để kiểm tra ngay!"
-            )
-            await asyncio.sleep(30)  # Xóa tin nhắn sau 30 giây
-            await welcome_message.delete()
+async def on_typing(channel, user, when):
+    """Gửi tin nhắn khi user mở kênh và chuẩn bị nhập tin nhắn"""
+    if channel.id == ALLOWED_CHANNEL_ID and not user.bot:
+        skill_count = len(data)
+        welcome_message = await channel.send(
+            f"👋 **Chào {user.mention}!**\n📌 Hiện tại có **{skill_count}** Skill.\n✍️ Gửi tên Skill để kiểm tra ngay!"
+        )
+        await asyncio.sleep(30)  # Xóa tin nhắn sau 30 giây
+        await welcome_message.delete()
 
 @bot.event
 async def on_message(message):
