@@ -36,24 +36,27 @@ def get_total_skill_count():
     return len(data)
 
 # **Sửa lại hàm dịch để tránh lỗi placeholder hiển thị**
+import re
+
 def translate_with_exclusions(text, excluded_words):
     """Dịch văn bản sang tiếng Việt nhưng giữ nguyên một số thuật ngữ"""
     replacement_map = {}
 
-    # Thay thế các từ khóa cần giữ nguyên bằng placeholder đặc biệt
+    # Tạo placeholder an toàn hơn
     for word in excluded_words:
-        placeholder = f"EXCLUDE_{word}_EXCLUDE"
+        placeholder = f"EXCLUDE_{word.replace(' ', '_').upper()}_EXCLUDE"
         replacement_map[placeholder] = word
         text = text.replace(word, placeholder)
 
     # Gửi văn bản qua Google Translate
     translated_text = translator.translate(text, src="en", dest="vi").text
 
-    # Thay thế lại các thuật ngữ về trạng thái ban đầu
+    # Khôi phục lại các thuật ngữ bằng regex (giúp tìm chính xác ngay cả khi bị đổi vị trí)
     for placeholder, word in replacement_map.items():
-        translated_text = translated_text.replace(placeholder, word)
+        translated_text = re.sub(re.escape(placeholder), word, translated_text, flags=re.IGNORECASE)
 
     return translated_text
+
 
 # Thiết lập intents cho bot
 intents = discord.Intents.default()
