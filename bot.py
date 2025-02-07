@@ -7,6 +7,9 @@ from discord.ext import commands
 # Lấy Token từ biến môi trường
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
+# ID của kênh được phép bot hoạt động (Thay bằng ID kênh của bạn)
+ALLOWED_CHANNEL_ID = 1337203470167576607  # Thay bằng ID kênh thực tế của bạn
+
 # Tên file dữ liệu Excel
 EXCEL_FILE = "passive_skills.xlsx"
 
