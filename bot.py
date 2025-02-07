@@ -25,12 +25,9 @@ def load_data():
 
 data = load_data()
 
-# Lưu lịch sử tin nhắn để xóa sau 24 giờ
-history_messages = []
-
 # Thiết lập intents cho bot
 intents = discord.Intents.default()
-intents.message_content = True  # Cho phép bot đọc nội dung tin nhắn
+intents.message_content = True
 
 # Khởi tạo bot với prefix "!"
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -42,39 +39,23 @@ async def on_ready():
 
 @bot.event
 async def on_message(message):
-    """Lắng nghe tất cả tin nhắn trong server và tự động tìm skill nếu có trong danh sách."""
-    if message.author == bot.user:  # Bỏ qua tin nhắn của bot để tránh loop vô hạn
+    """Chỉ xử lý tin nhắn trong kênh được phép"""
+    if message.author == bot.user:
         return
+    if message.channel.id != ALLOWED_CHANNEL_ID:
+        return  # Bỏ qua tin nhắn nếu không phải kênh cho phép
 
-    skill_name = message.content.strip()  # Lấy nội dung tin nhắn của người dùng
+    skill_name = message.content.strip()
     skill_info = data[data["Name"].str.lower() == skill_name.lower()]
 
     if not skill_info.empty:
         skill_type = skill_info.iloc[0]["Type"]
         skill_effect = skill_info.iloc[0]["Effect"]
-
-        # Chỉ in đậm tên skill
         response = f'**{skill_name}** ({skill_type})\n{skill_effect}'
-        msg = await message.channel.send(response)
-
-        # Lưu tin nhắn để xóa sau 24 giờ
-        history_messages.append(msg)
-
-        # Tự động xóa sau 24 giờ
-        await asyncio.sleep(86400)
-        await msg.delete()
-        history_messages.remove(msg)
+        await message.channel.send(response)
     else:
-        msg = await message.channel.send("❌ Không tìm thấy! Kiểm tra lại tên Skill xem đã chính xác chưa?")
-        
-        # Lưu tin nhắn để xóa sau 24 giờ
-        history_messages.append(msg)
+        await message.channel.send("❌ Không tìm thấy! Kiểm tra lại tên Skill xem đã chính xác chưa?")
 
-        # Tự động xóa sau 24 giờ
-        await asyncio.sleep(86400)
-        await msg.delete()
-        history_messages.remove(msg)
-
-    await bot.process_commands(message)  # Đảm bảo các lệnh khác vẫn hoạt động
+    await bot.process_commands(message)
 
 bot.run(TOKEN)
