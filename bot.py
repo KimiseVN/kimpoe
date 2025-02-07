@@ -7,8 +7,8 @@ from discord.ext import commands
 # Lấy Token từ biến môi trường
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
-# ID của kênh được phép bot hoạt động (Thay bằng ID kênh của bạn)
-ALLOWED_CHANNEL_ID = 1337203470167576607  # Thay bằng ID kênh thực tế của bạn
+# ID của kênh được phép bot hoạt động (Thay bằng ID kênh thực tế của bạn)
+ALLOWED_CHANNEL_ID = 1337203470167576607  # Thay bằng ID kênh Discord của bạn
 
 # Tên file dữ liệu Excel
 EXCEL_FILE = "passive_skills.xlsx"
@@ -28,6 +28,9 @@ data = load_data()
 # Thiết lập intents cho bot
 intents = discord.Intents.default()
 intents.message_content = True
+intents.guilds = True
+intents.typing = False
+intents.presences = False
 
 # Khởi tạo bot với prefix "!"
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -61,8 +64,18 @@ async def on_message(message):
         response = f'**{skill_name}** ({skill_type})\n{skill_effect}'
         await message.channel.send(response)
     else:
-        await message.channel.send("❌ Không tìm thấy! Kiểm tra lại tên Skill xem đã chính xác chưa?")
+        await message.channel.send("❌ Không tìm thấy Skill! Kiểm tra lại xem đã nhập đúng chưa.")
 
     await bot.process_commands(message)
+
+@bot.command()
+@commands.has_permissions(manage_messages=True)
+async def clear(ctx):
+    """Xóa toàn bộ tin nhắn trong kênh Chatbot"""
+    if ctx.channel.id == ALLOWED_CHANNEL_ID:
+        await ctx.channel.purge()
+        await ctx.send("🧹 **Đã xóa toàn bộ tin nhắn trong kênh này!**", delete_after=5)
+    else:
+        await ctx.send("❌ Lệnh này chỉ có thể sử dụng trong kênh được chỉ định.")
 
 bot.run(TOKEN)
