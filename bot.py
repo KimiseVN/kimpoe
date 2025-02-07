@@ -42,7 +42,7 @@ def translate_with_exclusions(text, excluded_words):
 
     # Thay thế các từ khóa cần giữ nguyên bằng placeholder đặc biệt
     for word in excluded_words:
-        placeholder = f"#EXCLUDE#{word}#EXCLUDE#"
+        placeholder = f"EXCLUDE_{word}_EXCLUDE"
         replacement_map[placeholder] = word
         text = text.replace(word, placeholder)
 
