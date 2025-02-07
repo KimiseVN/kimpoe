@@ -29,9 +29,7 @@ data = load_data()
 intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
-intents.typing = False
-intents.presences = False
-intents.members = True  # Cần thiết để theo dõi user vào kênh
+intents.members = True  # Cần bật "Server Members Intent" trong Developer Portal
 
 # Khởi tạo bot với prefix "!"
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -66,12 +64,13 @@ async def on_message(message):
             await message.channel.send("❌ Không tìm thấy Skill! Kiểm tra lại xem đã nhập đúng chưa.")
 
 @bot.event
-async def on_member_update(before, after):
-    """Tự động gửi thông báo khi user mở kênh"""
-    if after.activity and after.activity.name == "#passive-skill-check":  # Thay bằng tên kênh thực tế
+async def on_voice_state_update(member, before, after):
+    """Gửi tin nhắn khi user vào kênh"""
+    if after.channel and after.channel.id == ALLOWED_CHANNEL_ID:  # Kiểm tra nếu user vào đúng kênh
         skill_count = len(data)
-        welcome_message = await after.guild.get_channel(ALLOWED_CHANNEL_ID).send(
-            f"👋 Chào {after.mention}, hiện tại có **{skill_count}** Skill, hãy gửi tên Skill cần Check!"
+        channel = bot.get_channel(ALLOWED_CHANNEL_ID)
+        welcome_message = await channel.send(
+            f"👋 Chào {member.mention}, hiện tại có **{skill_count}** Skill, hãy gửi tên Skill cần Check!"
         )
         await asyncio.sleep(30)  # Xóa tin nhắn sau 30 giây
         await welcome_message.delete()
