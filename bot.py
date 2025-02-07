@@ -31,6 +31,7 @@ intents.message_content = True
 intents.guilds = True
 intents.typing = False
 intents.presences = False
+intents.members = True  # Cần thiết để theo dõi user vào kênh
 
 # Khởi tạo bot với prefix "!"
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -63,6 +64,17 @@ async def on_message(message):
     else:
         if not message.content.startswith("!"):  # Tránh báo lỗi khi gõ lệnh
             await message.channel.send("❌ Không tìm thấy Skill! Kiểm tra lại xem đã nhập đúng chưa.")
+
+@bot.event
+async def on_member_update(before, after):
+    """Tự động gửi thông báo khi user mở kênh"""
+    if after.activity and after.activity.name == "#passive-skill-check":  # Thay bằng tên kênh thực tế
+        skill_count = len(data)
+        welcome_message = await after.guild.get_channel(ALLOWED_CHANNEL_ID).send(
+            f"👋 Chào {after.mention}, hiện tại có **{skill_count}** Skill, hãy gửi tên Skill cần Check!"
+        )
+        await asyncio.sleep(30)  # Xóa tin nhắn sau 30 giây
+        await welcome_message.delete()
 
 @bot.command()
 @commands.has_permissions(manage_messages=True)
