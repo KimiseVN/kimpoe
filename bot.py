@@ -37,19 +37,19 @@ def get_total_skill_count():
 
 # **Sửa lại hàm dịch để tránh lỗi placeholder hiển thị**
 def translate_with_exclusions(text, excluded_words):
-    """Dịch văn bản sang tiếng Việt nhưng giữ nguyên một số từ"""
+    """Dịch văn bản sang tiếng Việt nhưng giữ nguyên một số thuật ngữ"""
     replacement_map = {}
 
-    # Thay thế các từ cần giữ nguyên bằng mã đặc biệt
+    # Thay thế các từ khóa cần giữ nguyên bằng placeholder đặc biệt
     for word in excluded_words:
-        placeholder = f"||{word}||"
+        placeholder = f"#EXCLUDE#{word}#EXCLUDE#"
         replacement_map[placeholder] = word
         text = text.replace(word, placeholder)
 
-    # Dịch văn bản
+    # Gửi văn bản qua Google Translate
     translated_text = translator.translate(text, src="en", dest="vi").text
 
-    # Thay thế lại các từ đã giữ nguyên
+    # Thay thế lại các thuật ngữ về trạng thái ban đầu
     for placeholder, word in replacement_map.items():
         translated_text = translated_text.replace(placeholder, word)
 
