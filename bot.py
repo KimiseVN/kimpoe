@@ -3,6 +3,7 @@ import discord
 import pandas as pd
 import asyncio
 from discord.ext import commands
+from googletrans import Translator  # Thêm thư viện dịch
 
 # Lấy Token từ biến môi trường
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
@@ -15,6 +16,9 @@ EXCEL_FILE = "passive_skills.xlsx"
 
 # ID của tin nhắn ghim (sẽ cập nhật sau lần chạy đầu)
 PINNED_MESSAGE_ID = None  
+
+# Khởi tạo bộ dịch
+translator = Translator()
 
 # Kiểm tra và tạo file Excel nếu chưa tồn tại
 if not os.path.exists(EXCEL_FILE):
@@ -58,7 +62,7 @@ async def update_pinned_message(channel):
     global PINNED_MESSAGE_ID
 
     skill_count = get_total_skill_count()
-    message_content = f"📌 **Có tổng cộng {skill_count} Skill Not**\n📝 Hãy nhập chính xác tên Skill Not để kiểm tra!"
+    message_content = f"📌 **Có tổng cộng {skill_count} Skill**\n📝 Hãy nhập chính xác tên Skill để kiểm tra!"
 
     async for message in channel.history(limit=50):
         if message.pinned:
@@ -89,7 +93,15 @@ async def on_message(message):
     if not skill_info.empty:
         skill_type = skill_info.iloc[0]["Type"]
         skill_effect = skill_info.iloc[0]["Effect"]
-        response = f'**{skill_name.capitalize()}** ({skill_type})\n{skill_effect}'
+
+        # Dịch phần Effect sang Tiếng Việt
+        translated_effect = translator.translate(skill_effect, src="en", dest="vi").text
+
+        response = (
+            f'**{skill_name.capitalize()}** ({skill_type})\n'
+            f'📜 **Effect (EN):** {skill_effect}\n'
+            f'🇻🇳 **Effect (VI):** {translated_effect}'
+        )
         await message.channel.send(response)
     else:
         if not message.content.startswith("!"):  # Tránh báo lỗi khi gõ lệnh
