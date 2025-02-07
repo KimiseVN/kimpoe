@@ -7,7 +7,7 @@ from discord.ext import commands
 # Lấy Token từ biến môi trường
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
-# ID của kênh Discord mà bot được phép hoạt động (Thay đúng ID kênh)
+# ID của kênh Discord mà bot được phép hoạt động
 ALLOWED_CHANNEL_ID = 1337203470167576607  # Cập nhật ID mới
 
 # Tên file dữ liệu Excel
@@ -29,6 +29,7 @@ data = load_data()
 intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
+intents.presences = True
 intents.members = True  # Cần bật "Server Members Intent" trong Developer Portal
 
 # Khởi tạo bot với prefix "!"
@@ -41,19 +42,12 @@ async def on_ready():
     print(f'🔹 Tổng số Skill hiện tại: {len(data)}')
 
 @bot.event
-async def on_member_update(before, after):
+async def on_guild_channel_pins_update(channel, last_pin):
     """Gửi tin nhắn khi user mở kênh"""
-    guild = after.guild
-    channel = bot.get_channel(ALLOWED_CHANNEL_ID)
-
-    if not channel:
-        print("⚠️ Không tìm thấy kênh chỉ định!")
-        return
-
-    if after.activity and after.activity.type == discord.ActivityType.watching:
+    if channel.id == ALLOWED_CHANNEL_ID:
         skill_count = len(data)
         welcome_message = await channel.send(
-            f"👋 Chào {after.mention}, hiện tại có **{skill_count}** Skill, hãy gửi tên Skill cần Check!"
+            f"👋 **Chào mừng bạn!**\n📌 Hiện tại có **{skill_count}** Skill.\n✍️ Gửi tên Skill để kiểm tra ngay!"
         )
         await asyncio.sleep(30)  # Xóa tin nhắn sau 30 giây
         await welcome_message.delete()
