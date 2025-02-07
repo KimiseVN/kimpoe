@@ -10,6 +10,9 @@ TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 # ID của kênh được phép bot hoạt động (Thay bằng ID kênh thực tế của bạn)
 ALLOWED_CHANNEL_ID = 1337203470167576607  # Thay bằng ID kênh Discord của bạn
 
+# Dictionary lưu trạng thái ai đã thấy thông báo lần đầu
+first_time_users = set()
+
 # Tên file dữ liệu Excel
 EXCEL_FILE = "passive_skills.xlsx"
 
@@ -41,19 +44,20 @@ async def on_ready():
     print(f'🔹 Tổng số Skill hiện tại: {len(data)}')
 
 @bot.event
-async def on_guild_channel_update(before, after):
-    """Khi mở kênh có bot, gửi thông báo hướng dẫn"""
-    if after.id == ALLOWED_CHANNEL_ID:
-        await after.send("📌 **Đây là kênh để Check Passive Skill**\n"
-                         "💡 Copy Paste hoặc nhập chính xác tên Skill Point để kiểm tra.")
-
-@bot.event
 async def on_message(message):
     """Chỉ xử lý tin nhắn trong kênh được phép"""
     if message.author == bot.user:
         return
     if message.channel.id != ALLOWED_CHANNEL_ID:
         return  # Bỏ qua tin nhắn nếu không phải kênh cho phép
+
+    # Hiển thị thông báo một lần duy nhất khi người dùng mở kênh lần đầu
+    if message.author.id not in first_time_users:
+        first_time_users.add(message.author.id)
+        await message.channel.send(
+            "📌 **Đây là kênh để Check Passive Skill**\n"
+            "💡 Copy Paste hoặc nhập chính xác tên Skill Point để kiểm tra."
+        )
 
     # Xử lý lệnh bot trước (fix lỗi !clear)
     await bot.process_commands(message)
