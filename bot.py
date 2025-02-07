@@ -7,8 +7,8 @@ from discord.ext import commands
 # Lấy Token từ biến môi trường
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
-# ID của kênh được phép bot hoạt động (Thay bằng ID kênh Discord thực tế)
-ALLOWED_CHANNEL_ID = 1337203470167576607  # Thay bằng ID kênh của bạn
+# ID của kênh Discord mà bot được phép hoạt động (Thay đúng ID kênh)
+ALLOWED_CHANNEL_ID = 1337203470167576607  # Cập nhật ID mới
 
 # Tên file dữ liệu Excel
 EXCEL_FILE = "passive_skills.xlsx"
@@ -36,8 +36,27 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 @bot.event
 async def on_ready():
+    """Bot đã khởi động thành công"""
     print(f'✅ Bot đã kết nối với Discord! Logged in as {bot.user}')
     print(f'🔹 Tổng số Skill hiện tại: {len(data)}')
+
+@bot.event
+async def on_member_update(before, after):
+    """Gửi tin nhắn khi user mở kênh"""
+    guild = after.guild
+    channel = bot.get_channel(ALLOWED_CHANNEL_ID)
+
+    if not channel:
+        print("⚠️ Không tìm thấy kênh chỉ định!")
+        return
+
+    if after.activity and after.activity.type == discord.ActivityType.watching:
+        skill_count = len(data)
+        welcome_message = await channel.send(
+            f"👋 Chào {after.mention}, hiện tại có **{skill_count}** Skill, hãy gửi tên Skill cần Check!"
+        )
+        await asyncio.sleep(30)  # Xóa tin nhắn sau 30 giây
+        await welcome_message.delete()
 
 @bot.event
 async def on_message(message):
@@ -62,18 +81,6 @@ async def on_message(message):
     else:
         if not message.content.startswith("!"):  # Tránh báo lỗi khi gõ lệnh
             await message.channel.send("❌ Không tìm thấy Skill! Kiểm tra lại xem đã nhập đúng chưa.")
-
-@bot.event
-async def on_voice_state_update(member, before, after):
-    """Gửi tin nhắn khi user vào kênh"""
-    if after.channel and after.channel.id == ALLOWED_CHANNEL_ID:  # Kiểm tra nếu user vào đúng kênh
-        skill_count = len(data)
-        channel = bot.get_channel(ALLOWED_CHANNEL_ID)
-        welcome_message = await channel.send(
-            f"👋 Chào {member.mention}, hiện tại có **{skill_count}** Skill, hãy gửi tên Skill cần Check!"
-        )
-        await asyncio.sleep(30)  # Xóa tin nhắn sau 30 giây
-        await welcome_message.delete()
 
 @bot.command()
 @commands.has_permissions(manage_messages=True)
