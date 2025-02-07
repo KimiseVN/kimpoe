@@ -13,6 +13,9 @@ ALLOWED_CHANNEL_ID = 1337203470167576607  # Cập nhật ID mới
 # Tên file dữ liệu Excel
 EXCEL_FILE = "passive_skills.xlsx"
 
+# Bộ nhớ tạm để lưu trạng thái người dùng trong kênh
+user_session = set()  # Chỉ lưu ID của những user đã nhận thông báo
+
 # Kiểm tra và tạo file Excel nếu chưa tồn tại
 if not os.path.exists(EXCEL_FILE):
     df = pd.DataFrame(columns=["Name", "Type", "Effect"])
@@ -30,7 +33,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
 intents.presences = True
-intents.members = True  # Cần bật "Server Members Intent" trong Developer Portal
+intents.members = True  # Cần bật "Server Members Intent"
 
 # Khởi tạo bot với prefix "!"
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -43,11 +46,12 @@ async def on_ready():
 
 @bot.event
 async def on_typing(channel, user, when):
-    """Gửi tin nhắn khi user mở kênh và chuẩn bị nhập tin nhắn"""
-    if channel.id == ALLOWED_CHANNEL_ID and not user.bot:
+    """Gửi tin nhắn chào mừng khi người dùng lần đầu chọn ô nhập"""
+    if channel.id == ALLOWED_CHANNEL_ID and user.id not in user_session:
+        user_session.add(user.id)  # Lưu trạng thái user đã nhận tin nhắn
         skill_count = len(data)
         welcome_message = await channel.send(
-            f"👋 **Chào {user.mention}!**\n📌 Hiện tại có **{skill_count}** Skill Not.\n✍️ Gửi tên Skill để kiểm tra ngay!"
+            f"👋 **Chào {user.mention}!**\n📌 Hiện tại có **{skill_count}** Skill.\n✍️ Gửi tên Skill để kiểm tra ngay!"
         )
         await asyncio.sleep(30)  # Xóa tin nhắn sau 30 giây
         await welcome_message.delete()
@@ -75,6 +79,13 @@ async def on_message(message):
     else:
         if not message.content.startswith("!"):  # Tránh báo lỗi khi gõ lệnh
             await message.channel.send("❌ Không tìm thấy Skill! Kiểm tra lại xem đã nhập đúng chưa.")
+
+@bot.event
+async def on_member_update(before, after):
+    """Xóa user khỏi session khi họ rời kênh"""
+    if before.activity and after.activity:
+        if before.activity.name == "Reading Messages" and after.activity.name != "Reading Messages":
+            user_session.discard(after.id)  # Xóa user khỏi cache khi họ rời kênh
 
 @bot.command()
 @commands.has_permissions(manage_messages=True)
