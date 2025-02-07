@@ -73,11 +73,16 @@ async def on_message(message):
 
 @bot.command()
 @commands.has_permissions(manage_messages=True)
-async def clear(ctx, limit: int = 100):
-    """Xóa toàn bộ tin nhắn trong kênh Chatbot (tối đa 1000 tin nhắn)"""
+async def clear(ctx, amount: int = 100):
+    """Xóa toàn bộ tin nhắn trong kênh Chatbot"""
     if ctx.channel.id == ALLOWED_CHANNEL_ID:
-        deleted = await ctx.channel.purge(limit=limit)
-        await ctx.send(f"🧹 **Đã xóa {len(deleted)} tin nhắn trong kênh này!**", delete_after=5)
+        try:
+            deleted = await ctx.channel.purge(limit=amount)
+            await ctx.send(f"🧹 **Đã xóa {len(deleted)} tin nhắn trong kênh này!**", delete_after=5)
+        except discord.Forbidden:
+            await ctx.send("❌ Bot không có quyền xóa tin nhắn! Hãy kiểm tra quyền 'Manage Messages'.")
+        except discord.HTTPException:
+            await ctx.send("❌ Lỗi khi xóa tin nhắn! Hãy thử lại sau.")
     else:
         await ctx.send("❌ Lệnh này chỉ có thể sử dụng trong kênh được chỉ định.")
 
