@@ -7,11 +7,8 @@ from discord.ext import commands
 # Lấy Token từ biến môi trường
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
-# ID của kênh cho phép bot hoạt động (Thay bằng ID kênh Discord thực tế)
+# ID của kênh được phép bot hoạt động (Thay bằng ID kênh Discord thực tế)
 ALLOWED_CHANNEL_ID = 1337203470167576607  # Thay bằng ID kênh của bạn
-
-# Dictionary lưu ID tin nhắn thông báo để xóa khi rời kênh
-welcome_messages = {}
 
 # Tên file dữ liệu Excel
 EXCEL_FILE = "passive_skills.xlsx"
@@ -32,7 +29,6 @@ data = load_data()
 intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
-intents.members = True  # Bật để theo dõi thành viên vào/ra kênh
 intents.typing = False
 intents.presences = False
 
@@ -43,32 +39,6 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 async def on_ready():
     print(f'✅ Bot đã kết nối với Discord! Logged in as {bot.user}')
     print(f'🔹 Tổng số Skill hiện tại: {len(data)}')
-
-@bot.event
-async def on_voice_state_update(member, before, after):
-    """Kiểm tra khi người dùng vào/rời kênh"""
-    channel = bot.get_channel(ALLOWED_CHANNEL_ID)
-
-    if after.channel and after.channel.id == ALLOWED_CHANNEL_ID:
-        # Khi người dùng vào kênh, bot gửi thông báo
-        if member.id not in welcome_messages:
-            total_skills = len(data)
-            welcome_message = await channel.send(
-                f"📢 **Chào {member.name}!**\n"
-                f"📌 Có tổng cộng **{total_skills} Skill** trong dữ liệu.\n"
-                "✏️ Gửi tên Skill muốn kiểm tra!"
-            )
-            welcome_messages[member.id] = welcome_message.id  # Lưu ID tin nhắn để xóa sau
-
-    elif before.channel and before.channel.id == ALLOWED_CHANNEL_ID:
-        # Khi người dùng rời kênh, bot xóa thông báo
-        if member.id in welcome_messages:
-            try:
-                msg = await channel.fetch_message(welcome_messages[member.id])
-                await msg.delete()
-            except discord.NotFound:
-                pass  # Tin nhắn có thể đã bị xóa trước đó
-            del welcome_messages[member.id]  # Xóa khỏi danh sách theo dõi
 
 @bot.event
 async def on_message(message):
@@ -101,14 +71,12 @@ async def clear(ctx, amount: int = 100):
     if ctx.channel.id == ALLOWED_CHANNEL_ID:
         try:
             deleted = await ctx.channel.purge(limit=amount)
-            confirm_msg = await ctx.send(f"🧹 **Đã xóa {len(deleted)} tin nhắn trong kênh này!**")
-            await asyncio.sleep(5)
-            await confirm_msg.delete()
+            await ctx.send(f"🧹 **Đã xóa {len(deleted)} tin nhắn trong kênh này!**", delete_after=5)
         except discord.Forbidden:
-            await ctx.send("❌ **Bot không có quyền xóa tin nhắn!** Hãy kiểm tra quyền 'Manage Messages'.")
+            await ctx.send("❌ Bot không có quyền xóa tin nhắn! Hãy kiểm tra quyền 'Manage Messages'.")
         except discord.HTTPException:
-            await ctx.send("❌ **Lỗi khi xóa tin nhắn!** Hãy thử lại sau.")
+            await ctx.send("❌ Lỗi khi xóa tin nhắn! Hãy thử lại sau.")
     else:
-        await ctx.send("❌ **Lệnh này chỉ có thể sử dụng trong kênh được chỉ định.**")
+        await ctx.send("❌ Lệnh này chỉ có thể sử dụng trong kênh được chỉ định.")
 
 bot.run(TOKEN)
