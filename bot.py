@@ -70,11 +70,11 @@ async def on_message(message):
 
 @bot.command()
 @commands.has_permissions(manage_messages=True)
-async def clear(ctx):
-    """Xóa toàn bộ tin nhắn trong kênh Chatbot"""
+async def clear(ctx, limit: int = 100):
+    """Xóa toàn bộ tin nhắn trong kênh Chatbot (tối đa 1000 tin nhắn)"""
     if ctx.channel.id == ALLOWED_CHANNEL_ID:
-        await ctx.channel.purge()
-        await ctx.send("🧹 **Đã xóa toàn bộ tin nhắn trong kênh này!**", delete_after=5)
+        deleted = await ctx.channel.purge(limit=limit)
+        await ctx.send(f"🧹 **Đã xóa {len(deleted)} tin nhắn trong kênh này!**", delete_after=5)
     else:
         await ctx.send("❌ Lệnh này chỉ có thể sử dụng trong kênh được chỉ định.")
 
