@@ -1,112 +1,87 @@
 import os
 import discord
 import pandas as pd
-import asyncio
-from discord.ext import commands
 from googletrans import Translator
+from discord.ext import commands
 
 # Lấy Token từ biến môi trường
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
-# ID của kênh Discord mà bot được phép hoạt động
-ALLOWED_CHANNEL_ID = 1337203470167576607
+# ID của kênh được phép bot hoạt động (Cập nhật theo server của bạn)
+ALLOWED_CHANNEL_ID = 1337203470167576607  # Thay bằng ID kênh của bạn
 
 # Tên file dữ liệu Excel
 EXCEL_FILE = "passive_skills.xlsx"
 
-# Danh sách từ khóa cần giữ nguyên khi dịch
-EXCLUDED_WORDS = [
-    "Critical Strike", "Spell Damage", "Fire Resistance", "Cold Resistance", "Life Leech",
-    "Strength", "Dexterity", "Intelligence", "Energy Shield", "Spirit", "Armour", "Evasion",
-    "Accuracy", "Physical Damage", "Critical Damage Bonus", "Critical Chance", "Life", "Mana",
-    "Attributes", "Lightning Damage", "Cold Damage", "Fire Damage"
-]
+# Kiểm tra và tạo file Excel nếu chưa tồn tại
+if not os.path.exists(EXCEL_FILE):
+    df = pd.DataFrame(columns=["Name", "Type", "Effect"])
+    df.to_excel(EXCEL_FILE, index=False)
+    print("✅ Đã tạo file passive_skills.xlsx")
+
+def load_data():
+    """Load dữ liệu từ file Excel"""
+    return pd.read_excel(EXCEL_FILE).fillna("")  # Xử lý giá trị NaN nếu có
+
+data = load_data()
 
 # Khởi tạo bộ dịch
 translator = Translator()
 
-# Load dữ liệu từ file Excel
-def load_data():
-    return pd.read_excel(EXCEL_FILE).fillna("")
-
-data = load_data()
-
-# Đếm tổng số lượng Skill
-def get_total_skill_count():
-    return len(data)
-
-# **Sửa lại hàm dịch để tránh lỗi placeholder hiển thị**
-import re
-
-def translate_with_exclusions(text, excluded_words):
-    """Dịch văn bản sang tiếng Việt nhưng giữ nguyên một số thuật ngữ"""
-    replacement_map = {}
-
-    # Tạo placeholder an toàn hơn
-    for word in excluded_words:
-        placeholder = f"EXCLUDE_{word.replace(' ', '_').upper()}_EXCLUDE"
-        replacement_map[placeholder] = word
-        text = text.replace(word, placeholder)
-
-    # Gửi văn bản qua Google Translate
+def translate_text(text):
+    """Dịch văn bản từ tiếng Anh sang tiếng Việt"""
     translated_text = translator.translate(text, src="en", dest="vi").text
-
-    # Khôi phục lại các thuật ngữ bằng regex (giúp tìm chính xác ngay cả khi bị đổi vị trí)
-    for placeholder, word in replacement_map.items():
-        translated_text = re.sub(re.escape(placeholder), word, translated_text, flags=re.IGNORECASE)
-
     return translated_text
-
 
 # Thiết lập intents cho bot
 intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
+intents.typing = False
 intents.presences = False
-intents.members = False
 
+# Khởi tạo bot với prefix "!"
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 @bot.event
 async def on_ready():
     print(f'✅ Bot đã kết nối với Discord! Logged in as {bot.user}')
-    print(f'🔹 Tổng số Skill hiện tại: {get_total_skill_count()}')
+    print(f'🔹 Tổng số Skill hiện tại: {len(data)}')
 
 @bot.event
 async def on_message(message):
+    """Chỉ xử lý tin nhắn trong kênh được phép"""
     if message.author == bot.user:
         return
     if message.channel.id != ALLOWED_CHANNEL_ID:
-        return  
+        return  # Bỏ qua tin nhắn nếu không phải kênh cho phép
 
+    # Xử lý lệnh bot trước
     await bot.process_commands(message)
 
     # Chuẩn hóa tên Skill để tìm kiếm chính xác
-    skill_query = message.content.strip().lower()
-    skill_results = data[data["Name"].str.strip().str.lower() == skill_query]
+    skill_name = message.content.strip().lower()
+    skill_info = data[data["Name"].str.strip().str.lower() == skill_name]
 
-    if not skill_results.empty:
-        row = skill_results.iloc[0]
-        skill_name = row["Name"]
-        skill_type = row["Type"]
-        skill_effect = row["Effect"]
-
-        # Dịch phần Effect sang Tiếng Việt nhưng giữ nguyên thuật ngữ
-        translated_effect = translate_with_exclusions(skill_effect, EXCLUDED_WORDS)
+    if not skill_info.empty:
+        skill_type = skill_info.iloc[0]["Type"]
+        skill_effect = skill_info.iloc[0]["Effect"]
+        skill_effect_vi = translate_text(skill_effect)  # Dịch sang tiếng Việt
 
         response = (
-            f'**{skill_name}** ({skill_type})\n'
+            f'**{skill_name.capitalize()}** ({skill_type})\n'
             f'📜 **Effect (EN):** {skill_effect}\n'
-            f'🇻🇳 **Effect (VI):** {translated_effect}'
+            f'🇻🇳 **Effect (VI):** {skill_effect_vi}'
         )
         await message.channel.send(response)
     else:
-        if not message.content.startswith("!"):
+        if not message.content.startswith("!"):  # Tránh báo lỗi khi gõ lệnh bot
             await message.channel.send("❌ Không tìm thấy Skill! Kiểm tra lại xem đã nhập đúng chưa.")
 
 @bot.command()
 @commands.has_permissions(manage_messages=True)
 async def clear(ctx, amount: int = 100):
+    """Xóa toàn bộ tin nhắn trong kênh Chatbot"""
     if ctx.channel.id == ALLOWED_CHANNEL_ID:
         try:
             deleted = await ctx.channel.purge(limit=amount)
