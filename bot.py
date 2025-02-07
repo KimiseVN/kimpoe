@@ -55,6 +55,10 @@ async def on_message(message):
     if message.channel.id != ALLOWED_CHANNEL_ID:
         return  # Bỏ qua tin nhắn nếu không phải kênh cho phép
 
+    # Xử lý lệnh bot trước (fix lỗi !clear)
+    await bot.process_commands(message)
+
+    # Xử lý tra cứu Skill
     skill_name = message.content.strip()
     skill_info = data[data["Name"].str.lower() == skill_name.lower()]
 
@@ -64,9 +68,8 @@ async def on_message(message):
         response = f'**{skill_name}** ({skill_type})\n{skill_effect}'
         await message.channel.send(response)
     else:
-        await message.channel.send("❌ Không tìm thấy Skill! Kiểm tra lại xem đã nhập đúng chưa.")
-
-    await bot.process_commands(message)
+        if not message.content.startswith("!"):  # Tránh báo lỗi khi gõ lệnh
+            await message.channel.send("❌ Không tìm thấy Skill! Kiểm tra lại xem đã nhập đúng chưa.")
 
 @bot.command()
 @commands.has_permissions(manage_messages=True)
