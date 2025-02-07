@@ -38,6 +38,13 @@ async def on_ready():
     print(f'🔹 Tổng số Skill hiện tại: {len(data)}')
 
 @bot.event
+async def on_guild_channel_update(before, after):
+    """Khi mở kênh có bot, gửi thông báo hướng dẫn"""
+    if after.id == ALLOWED_CHANNEL_ID:
+        await after.send("📌 **Đây là kênh để Check Passive Skill**\n"
+                         "💡 Copy Paste hoặc nhập chính xác tên Skill Point để kiểm tra.")
+
+@bot.event
 async def on_message(message):
     """Chỉ xử lý tin nhắn trong kênh được phép"""
     if message.author == bot.user:
