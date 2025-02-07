@@ -60,7 +60,7 @@ async def on_message(message):
         response = (
             f'**{skill_name.capitalize()}** ({skill_type})\n'
             f'📜 **Effect (EN):** {skill_effect}\n'
-            f'🇻🇳 **Effect (VI) (Bấm để mở):** ||{skill_effect_vi}||'
+            f'🇻🇳 **Effect (VI):** ||{skill_effect_vi}||'
         )
         await message.channel.send(response)
 
@@ -101,7 +101,7 @@ async def process_image(message, attachment):
                 response_text += (
                     f'\n**{skill}** ({skill_type})\n'
                     f'📜 **Effect (EN):** {skill_effect}\n'
-                    f'🇻🇳 **Effect (VI) (Bấm để mở):** ||{skill_effect_vi}||\n'
+                    f'🇻🇳 **Effect (VI):** ||{skill_effect_vi}||\n'
                 )
             await message.channel.send(response_text)
         else:
