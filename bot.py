@@ -47,7 +47,7 @@ async def on_typing(channel, user, when):
     if channel.id == ALLOWED_CHANNEL_ID and not user.bot:
         skill_count = len(data)
         welcome_message = await channel.send(
-            f"👋 **Chào {user.mention}!**\n📌 Hiện tại có **{skill_count}** Skill.\n✍️ Gửi tên Skill để kiểm tra ngay!"
+            f"👋 **Chào {user.mention}!**\n📌 Hiện tại có **{skill_count}** Skill Not.\n✍️ Gửi tên Skill để kiểm tra ngay!"
         )
         await asyncio.sleep(30)  # Xóa tin nhắn sau 30 giây
         await welcome_message.delete()
