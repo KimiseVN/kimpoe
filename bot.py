@@ -32,6 +32,7 @@ data = load_data()
 intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
+intents.members = True  # Cần thiết để theo dõi người dùng vào kênh
 intents.typing = False
 intents.presences = False
 
@@ -44,20 +45,24 @@ async def on_ready():
     print(f'🔹 Tổng số Skill hiện tại: {len(data)}')
 
 @bot.event
+async def on_voice_state_update(member, before, after):
+    """Kiểm tra khi người dùng vào kênh"""
+    if after.channel and after.channel.id == ALLOWED_CHANNEL_ID and member.id not in first_time_users:
+        first_time_users.add(member.id)
+        channel = bot.get_channel(ALLOWED_CHANNEL_ID)
+        if channel:
+            await channel.send(
+                f"📌 **{member.name}, đây là kênh để Check Passive Skill, được tạo bởi Anh Kim**\n"
+                "💡 Copy Paste hoặc nhập chính xác tên Skill Point để kiểm tra."
+            )
+
+@bot.event
 async def on_message(message):
     """Chỉ xử lý tin nhắn trong kênh được phép"""
     if message.author == bot.user:
         return
     if message.channel.id != ALLOWED_CHANNEL_ID:
         return  # Bỏ qua tin nhắn nếu không phải kênh cho phép
-
-    # Hiển thị thông báo một lần duy nhất khi người dùng mở kênh lần đầu
-    if message.author.id not in first_time_users:
-        first_time_users.add(message.author.id)
-        await message.channel.send(
-            "📌 **Đây là kênh để Check Passive Skill**\n"
-            "💡 Copy Paste hoặc nhập chính xác tên Skill Point để kiểm tra."
-        )
 
     # Xử lý lệnh bot trước (fix lỗi !clear)
     await bot.process_commands(message)
