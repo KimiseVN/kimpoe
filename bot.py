@@ -7,11 +7,8 @@ from discord.ext import commands
 # Lấy Token từ biến môi trường
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
-# ID của kênh được phép bot hoạt động (Thay bằng ID kênh thực tế của bạn)
-ALLOWED_CHANNEL_ID = 1337203470167576607  # Thay bằng ID kênh Discord của bạn
-
-# Dictionary lưu trạng thái ai đã thấy thông báo lần đầu
-first_time_users = set()
+# ID của kênh được phép bot hoạt động (Thay bằng ID kênh Discord thực tế)
+ALLOWED_CHANNEL_ID = 1337203470167576607  # Thay bằng ID kênh của bạn
 
 # Tên file dữ liệu Excel
 EXCEL_FILE = "passive_skills.xlsx"
@@ -24,7 +21,7 @@ if not os.path.exists(EXCEL_FILE):
 
 def load_data():
     """Load dữ liệu từ file Excel"""
-    return pd.read_excel(EXCEL_FILE)
+    return pd.read_excel(EXCEL_FILE).fillna("")  # Xử lý giá trị NaN nếu có
 
 data = load_data()
 
@@ -32,7 +29,6 @@ data = load_data()
 intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
-intents.members = True  # Cần thiết để theo dõi người dùng vào kênh
 intents.typing = False
 intents.presences = False
 
@@ -45,18 +41,6 @@ async def on_ready():
     print(f'🔹 Tổng số Skill hiện tại: {len(data)}')
 
 @bot.event
-async def on_voice_state_update(member, before, after):
-    """Kiểm tra khi người dùng vào kênh"""
-    if after.channel and after.channel.id == ALLOWED_CHANNEL_ID and member.id not in first_time_users:
-        first_time_users.add(member.id)
-        channel = bot.get_channel(ALLOWED_CHANNEL_ID)
-        if channel:
-            await channel.send(
-                f"📌 **{member.name}, đây là kênh để Check Passive Skill, được tạo bởi Anh Kim**\n"
-                "💡 Copy Paste hoặc nhập chính xác tên Skill Point để kiểm tra."
-            )
-
-@bot.event
 async def on_message(message):
     """Chỉ xử lý tin nhắn trong kênh được phép"""
     if message.author == bot.user:
@@ -67,14 +51,14 @@ async def on_message(message):
     # Xử lý lệnh bot trước (fix lỗi !clear)
     await bot.process_commands(message)
 
-    # Xử lý tra cứu Skill
-    skill_name = message.content.strip()
-    skill_info = data[data["Name"].str.lower() == skill_name.lower()]
+    # Chuẩn hóa tên Skill để tìm kiếm chính xác
+    skill_name = message.content.strip().lower()
+    skill_info = data[data["Name"].str.strip().str.lower() == skill_name]
 
     if not skill_info.empty:
         skill_type = skill_info.iloc[0]["Type"]
         skill_effect = skill_info.iloc[0]["Effect"]
-        response = f'**{skill_name}** ({skill_type})\n{skill_effect}'
+        response = f'**{skill_name.capitalize()}** ({skill_type})\n{skill_effect}'
         await message.channel.send(response)
     else:
         if not message.content.startswith("!"):  # Tránh báo lỗi khi gõ lệnh
