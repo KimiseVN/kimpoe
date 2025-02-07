@@ -3,7 +3,7 @@ import discord
 import pandas as pd
 import asyncio
 from discord.ext import commands
-from googletrans import Translator  # Thêm thư viện dịch
+from googletrans import Translator  # Dùng googletrans để dịch
 
 # Lấy Token từ biến môi trường
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
@@ -87,21 +87,26 @@ async def on_message(message):
     await bot.process_commands(message)
 
     # Chuẩn hóa tên Skill để tìm kiếm chính xác
-    skill_name = message.content.strip().lower()
-    skill_info = data[data["Name"].str.strip().str.lower() == skill_name]
+    skill_query = message.content.strip().lower()
+    skill_results = data[data["Name"].str.strip().str.lower().str.contains(skill_query, na=False, regex=False)]
 
-    if not skill_info.empty:
-        skill_type = skill_info.iloc[0]["Type"]
-        skill_effect = skill_info.iloc[0]["Effect"]
+    if not skill_results.empty:
+        response = "**🔍 Kết quả tìm kiếm:**\n"
+        for _, row in skill_results.iterrows():
+            skill_name = row["Name"]
+            skill_type = row["Type"]
+            skill_effect = row["Effect"]
 
-        # Dịch phần Effect sang Tiếng Việt
-        translated_effect = translator.translate(skill_effect, src="en", dest="vi").text
+            # Dịch phần Effect sang Tiếng Việt bằng googletrans
+            translated_effect = translator.translate(skill_effect, src="en", dest="vi").text
 
-        response = (
-            f'**{skill_name.capitalize()}** ({skill_type})\n'
-            f'📜 **Effect (EN):** {skill_effect}\n'
-            f'🇻🇳 **Effect (VI):** {translated_effect}'
-        )
+            response += (
+                f'\n**{skill_name}** ({skill_type})\n'
+                f'📜 **Effect (EN):** {skill_effect}\n'
+                f'🇻🇳 **Effect (VI):** {translated_effect}\n'
+                f'{"-"*40}'
+            )
+
         await message.channel.send(response)
     else:
         if not message.content.startswith("!"):  # Tránh báo lỗi khi gõ lệnh
