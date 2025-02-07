@@ -7,8 +7,11 @@ from discord.ext import commands
 # Lấy Token từ biến môi trường
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
-# ID của kênh được phép bot hoạt động (Thay bằng ID kênh Discord thực tế)
-ALLOWED_CHANNEL_ID = 1337203470167576607  # Thay bằng ID kênh của bạn
+# ID của kênh được phép bot hoạt động (Thay bằng ID kênh thực tế của bạn)
+ALLOWED_CHANNEL_ID = 1337203470167576607  # Thay bằng ID kênh Discord của bạn
+
+# Dictionary lưu ID tin nhắn chào mừng của mỗi người dùng
+welcome_messages = {}
 
 # Tên file dữ liệu Excel
 EXCEL_FILE = "passive_skills.xlsx"
@@ -29,6 +32,7 @@ data = load_data()
 intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
+intents.members = True  # Bật để theo dõi thành viên vào/ra kênh
 intents.typing = False
 intents.presences = False
 
@@ -39,6 +43,32 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 async def on_ready():
     print(f'✅ Bot đã kết nối với Discord! Logged in as {bot.user}')
     print(f'🔹 Tổng số Skill hiện tại: {len(data)}')
+
+@bot.event
+async def on_voice_state_update(member, before, after):
+    """Kiểm tra khi người dùng vào/rời kênh"""
+    channel = bot.get_channel(ALLOWED_CHANNEL_ID)
+
+    if after.channel and after.channel.id == ALLOWED_CHANNEL_ID:
+        # Khi người dùng vào kênh, bot gửi thông báo
+        if member.id not in welcome_messages:
+            total_skills = len(data)
+            welcome_message = await channel.send(
+                f"📢 **Chào {member.name}!**\n"
+                f"📌 Có tổng cộng **{total_skills} Skill** trong dữ liệu.\n"
+                "✏️ Gửi tên Skill muốn kiểm tra!"
+            )
+            welcome_messages[member.id] = welcome_message.id  # Lưu ID tin nhắn để xóa sau
+
+    elif before.channel and before.channel.id == ALLOWED_CHANNEL_ID:
+        # Khi người dùng rời kênh, bot xóa thông báo
+        if member.id in welcome_messages:
+            try:
+                msg = await channel.fetch_message(welcome_messages[member.id])
+                await msg.delete()
+            except discord.NotFound:
+                pass  # Tin nhắn có thể đã bị xóa trước đó
+            del welcome_messages[member.id]  # Xóa khỏi danh sách theo dõi
 
 @bot.event
 async def on_message(message):
